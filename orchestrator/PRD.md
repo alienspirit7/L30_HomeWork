@@ -44,6 +44,29 @@ Step 3: Generate Feedback → processing_coordinator.feedback_manager
 Step 4: Create Drafts    → email_coordinator.draft_manager
 ```
 
+### Data Passing Strategy
+
+Data flows between coordinators via **in-memory objects**, not file paths:
+
+```python
+# Step 1: Get emails
+email_result = email_coordinator.read_emails(mode, batch_size)
+email_records = email_result["emails"]
+
+# Step 2: Grade (pass email_records)
+grade_result = processing_coordinator.grade(email_records)
+grade_records = grade_result["grades"]
+
+# Step 3: Feedback (pass grade_records)
+feedback_result = processing_coordinator.generate_feedback(grade_records)
+feedback_records = feedback_result["feedback"]
+
+# Step 4: Drafts (pass both email_records and feedback_records)
+draft_result = email_coordinator.create_drafts(email_records, feedback_records)
+```
+
+Each manager also saves its output to Excel files for persistence/recovery.
+
 ---
 
 ## Configuration

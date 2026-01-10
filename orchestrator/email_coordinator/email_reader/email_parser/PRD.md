@@ -41,6 +41,7 @@ None (Internal logic)
 ```python
 {
     "email_id": str,            # SHA-256 hash
+    "message_id": str,          # Original Gmail message ID (for replies)
     "email_datetime": str,
     "email_subject": str,
     "repo_url": str | None,

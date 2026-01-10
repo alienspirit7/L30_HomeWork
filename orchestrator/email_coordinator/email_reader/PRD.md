@@ -48,6 +48,7 @@ Manages inbound email processing: fetching emails from Gmail and parsing them in
 | Column | Type | Description |
 |--------|------|-------------|
 | email_id | str | SHA-256 hash identifier |
+| message_id | str | Gmail message ID (for reply threading) |
 | email_datetime | str | Timestamp of email |
 | email_subject | str | Email subject line |
 | repo_url | str | GitHub repository URL |

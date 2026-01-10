@@ -28,7 +28,7 @@ None (Leaf node)
     "style": str,               # Style name from Style Selector
     "context": {
         "grade": float,
-        "student_name": str
+        "email_id": str
     }
 }
 ```
