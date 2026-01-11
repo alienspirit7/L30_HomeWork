@@ -1,0 +1,10 @@
+{
+  "raw_email": {
+    "message_id": "msg_12345abc",
+    "thread_id": "thread_67890def",
+    "sender": "student@example.com",
+    "subject": "Self check of homework 42",
+    "body": "Hi Professor,\n\nI've completed homework 42. Here's my GitHub repository:\nhttps://github.com/student123/homework-42\n\nPlease review when you get a chance.\n\nBest regards,\nStudent",
+    "datetime": "2026-01-11T10:30:00Z"
+  }
+}

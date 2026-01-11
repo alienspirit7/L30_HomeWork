@@ -1,0 +1,103 @@
+# ============================================
+# SECURITY - API Keys & Credentials (CRITICAL)
+# ============================================
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# Google OAuth credentials
+credentials.json
+token.json
+client_secret*.json
+**/credentials/
+**/secrets/
+
+# API Keys - catch any accidentally hardcoded
+*_api_key*
+*_secret*
+*.pem
+*.key
+
+# ============================================
+# Python Virtual Environments
+# ============================================
+venv/
+.venv/
+env/
+.env/
+ENV/
+virtualenv/
+
+# ============================================
+# Python Cache & Compiled
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ============================================
+# Distribution / Packaging
+# ============================================
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# ============================================
+# IDE & Editors
+# ============================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+
+# ============================================
+# Temporary Files
+# ============================================
+*.tmp
+*.temp
+tmp/
+temp/
+data/tmp/
+
+# ============================================
+# Cloned Repositories (temporary grading)
+# ============================================
+**/repos/
+
+# ============================================
+# OS Generated
+# ============================================
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+
+# ============================================
+# Test & Coverage
+# ============================================
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+
+# ============================================
+# Student Data (Privacy)
+# ============================================
+students_mapping.xlsx
+**/output/*.xlsx

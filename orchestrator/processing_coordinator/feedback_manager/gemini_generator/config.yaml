@@ -1,0 +1,20 @@
+service:
+  name: gemini_generator
+  version: "1.0.0"
+
+gemini:
+  api_key_env: "GEMINI_API_KEY"
+  model: "gemini-pro"
+
+rate_limiting:
+  request_delay_seconds: 60
+  max_retries: 3
+  retry_delay_seconds: 5
+
+generation:
+  max_tokens: 500
+  temperature: 0.7
+
+logging:
+  level: INFO
+  file: "./logs/gemini_generator.log"

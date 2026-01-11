@@ -1,0 +1,23 @@
+service:
+  name: python_analyzer
+  version: "1.0.0"
+
+analysis:
+  file_extensions: [".py"]
+  exclude_patterns:
+    - "**/venv/**"
+    - "**/__pycache__/**"
+    - "**/test_*.py"
+    - "**/*_test.py"
+    - "**/setup.py"
+    - "**/conftest.py"
+
+grading:
+  line_threshold: 150
+  exclude_comments: true
+  exclude_blank_lines: true
+  exclude_docstrings: true
+
+logging:
+  level: INFO
+  file: "./logs/python_analyzer.log"

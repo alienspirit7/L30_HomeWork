@@ -1,0 +1,19 @@
+service:
+  name: github_cloner
+  version: "1.0.0"
+
+git:
+  command: "git"
+  clone_args: ["--depth", "1"]  # Shallow clone for speed
+
+defaults:
+  timeout_seconds: 60
+  temp_directory: "./data/tmp/repos"
+  max_workers: 5
+
+cleanup:
+  delete_after_use: true
+
+logging:
+  level: INFO
+  file: "./logs/github_cloner.log"

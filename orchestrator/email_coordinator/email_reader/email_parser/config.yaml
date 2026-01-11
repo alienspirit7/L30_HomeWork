@@ -1,0 +1,18 @@
+service:
+  name: email_parser
+  version: "1.0.0"
+
+patterns:
+  subject_pattern: "self check of homework \\d{1,3}"
+  github_patterns:
+    - "https://github.com/[\\w-]+/[\\w-]+(?:\\.git)?"
+    - "github.com/[\\w-]+/[\\w-]+"
+
+validation:
+  required_fields:
+    - repo_url
+    - sender_email
+
+logging:
+  level: INFO
+  file: "./logs/email_parser.log"

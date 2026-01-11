@@ -1,0 +1,17 @@
+service:
+  name: draft_composer
+  version: "1.0.0"
+
+gmail:
+  credentials_path: "./data/credentials/credentials.json"
+  token_path: "./data/credentials/token.json"
+  scopes:
+    - "https://www.googleapis.com/auth/gmail.compose"
+
+defaults:
+  sender_name: "Elena"
+  subject_prefix: "Re: "
+
+logging:
+  level: INFO
+  file: "./logs/draft_composer.log"

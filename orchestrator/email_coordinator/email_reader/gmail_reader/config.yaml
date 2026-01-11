@@ -1,0 +1,18 @@
+service:
+  name: gmail_reader
+  version: "1.0.0"
+
+gmail:
+  credentials_path: "./data/credentials/credentials.json"
+  token_path: "./data/credentials/token.json"
+  scopes:
+    - "https://www.googleapis.com/auth/gmail.readonly"
+    - "https://www.googleapis.com/auth/gmail.modify"
+
+defaults:
+  max_results: 100
+  search_query: "subject:(self check of homework) is:unread"
+
+logging:
+  level: INFO
+  file: "./logs/gmail_reader.log"

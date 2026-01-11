@@ -1,0 +1,21 @@
+service:
+  name: student_mapper
+  version: "1.0.0"
+
+data:
+  mapping_file: "./data/students_mapping.xlsx"
+
+columns:
+  email_column: "email_address"
+  name_column: "name"
+
+defaults:
+  fallback_name: "Student"
+
+caching:
+  enabled: true
+  reload_on_change: true
+
+logging:
+  level: INFO
+  file: "./logs/student_mapper.log"
