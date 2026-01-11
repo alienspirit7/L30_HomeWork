@@ -89,6 +89,10 @@ class TestDraftComposerService(unittest.TestCase):
         mock_yaml_load.return_value = self.test_config
         service = DraftComposerService('./config.yaml')
 
+        # Mock Gmail service to avoid authentication during test
+        mock_gmail = MagicMock()
+        service.gmail_service = mock_gmail
+
         # Test input missing 'body' field
         input_data = {
             'to_email': 'student@example.com',
