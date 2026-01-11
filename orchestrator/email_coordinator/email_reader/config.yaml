@@ -1,0 +1,28 @@
+manager:
+  name: email_reader
+  version: "1.0.0"
+  description: "Manages inbound email processing: fetching emails from Gmail and parsing them into structured records"
+
+children:
+  gmail_reader: "./gmail_reader"
+  email_parser: "./email_parser"
+
+output:
+  file_path: "./data/output/file_1_2.xlsx"
+  directory: "./data/output"
+
+modes:
+  test:
+    batch_size: 5
+  batch:
+    batch_size: 50
+  full:
+    batch_size: 1000
+
+gmail_search:
+  query: "subject:(self check of homework) is:unread"
+
+logging:
+  level: INFO
+  file: "./logs/email_reader.log"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

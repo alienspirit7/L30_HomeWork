@@ -1,0 +1,16 @@
+manager:
+  name: draft_manager
+  version: "1.0.0"
+
+children:
+  draft_composer: "./draft_composer"
+  student_mapper: "./student_mapper"
+
+email_template:
+  greeting: "Hi, {name}!"
+  signature: "Thanks, Elena"
+  repo_line: "Your code repository reviewed: {repo_url}"
+
+logging:
+  level: INFO
+  file: "./logs/draft_manager.log"

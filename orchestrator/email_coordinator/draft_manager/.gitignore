@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+myenv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/*.log
+*.log
+
+# Test Coverage
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.coverage.*
+coverage.xml
+*.cover
+
+# Screenshots (keep for documentation)
+# screenshots/
+
+# Data Files (keep)
+# data/
+# output/
+# results/
+
+# Credentials (DO NOT COMMIT)
+**/credentials.json
+**/token.json
+*.pem
+*.key
+
+# Temporary Files
+*.tmp
+*.bak
+.cache/
+
+# OS Files
+Thumbs.db

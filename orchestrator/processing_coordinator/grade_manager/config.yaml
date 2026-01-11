@@ -1,0 +1,27 @@
+manager:
+  name: grade_manager
+  version: "1.0.0"
+
+children:
+  github_cloner: "./github_cloner"
+  python_analyzer: "./python_analyzer"
+
+input:
+  # Path to email reader output (relative to this directory)
+  file_path: "../email_coordinator/email_reader/data/output/file_1_2.xlsx"
+
+output:
+  # Path for grade results
+  file_path: "./data/output/file_2_3.xlsx"
+
+parallelism:
+  # Maximum number of concurrent grading operations
+  max_workers: 5
+
+cleanup:
+  # Delete cloned repositories after grading
+  delete_repos_after_grading: true
+
+logging:
+  level: INFO
+  file: "./logs/grade_manager.log"

@@ -1,0 +1,15 @@
+# Draft Manager Dependencies
+pyyaml>=6.0.0
+pandas>=1.3.0
+openpyxl>=3.1.0
+
+# Testing dependencies
+pytest>=7.0.0
+pytest-cov>=3.0.0
+
+# Logging
+colorlog>=6.0.0
+
+# Child service dependencies (install separately in each child directory)
+# See ./draft_composer/requirements.txt
+# See ./student_mapper/requirements.txt
