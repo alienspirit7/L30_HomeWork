@@ -2,6 +2,8 @@
 
 An automated Python package for processing student homework submissions via Gmail, cloning GitHub repositories, analyzing code, generating AI-powered feedback, and creating personalized email draft responses.
 
+> **📌 Original Project:** This system is a re-implementation of the original homework grading tool using a Binomial Tree architecture. See the initial project: [L19_HomeWork](https://github.com/alienspirit7/L19_HomeWork.git)
+
 ## Table of Contents
 
 - [Features](#features)
