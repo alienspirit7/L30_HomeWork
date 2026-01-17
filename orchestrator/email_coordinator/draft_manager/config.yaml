@@ -11,6 +11,13 @@ email_template:
   signature: "Thanks, Elena"
   repo_line: "Your code repository reviewed: {repo_url}"
 
+retry:
+  max_attempts: 3
+  min_wait_seconds: 2
+  max_wait_seconds: 10
+
 logging:
   level: INFO
   file: "./logs/draft_manager.log"
+  max_bytes: 5242880  # 5MB
+  backup_count: 3

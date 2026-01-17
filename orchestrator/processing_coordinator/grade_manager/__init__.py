@@ -6,6 +6,6 @@ Orchestrates repository grading by cloning GitHub repositories and analyzing Pyt
 __version__ = "1.0.0"
 __author__ = "Grade Manager Team"
 
-# This will be imported when the service implementation is created
-# from .service import GradeManagerService
-# __all__ = ['GradeManagerService']
+from grade_manager.service import GradeManagerService
+
+__all__ = ['GradeManagerService']

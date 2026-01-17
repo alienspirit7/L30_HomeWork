@@ -13,8 +13,10 @@ Example:
 """
 
 import argparse
+import os
 import sys
 import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 try:
@@ -25,14 +27,42 @@ except ImportError:
     sys.exit(1)
 
 
-def setup_logging(level=logging.INFO):
-    """Configure logging for CLI mode."""
+def setup_logging(
+    level=logging.INFO,
+    log_file=None,
+    max_bytes=5*1024*1024,
+    backup_count=3
+):
+    """
+    Configure logging for CLI mode with optional file rotation.
+
+    Args:
+        level: Logging level (default: INFO)
+        log_file: Path to log file (optional)
+        max_bytes: Max size per log file before rotation (default: 5MB)
+        backup_count: Number of backup files to keep (default: 3)
+    """
+    handlers = [logging.StreamHandler(sys.stdout)]
+
+    if log_file:
+        # Ensure log directory exists
+        log_path = Path(log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=max_bytes,
+            backupCount=backup_count
+        )
+        file_handler.setFormatter(
+            logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        )
+        handlers.append(file_handler)
+
     logging.basicConfig(
         level=level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(sys.stdout)
-        ]
+        handlers=handlers
     )
 
 
@@ -150,19 +180,50 @@ def print_results(result: dict):
 
 def main():
     """Main CLI entry point."""
+    import yaml
+
     args = parse_arguments()
 
-    # Setup logging
-    log_level = logging.DEBUG if args.verbose else logging.INFO
-    setup_logging(log_level)
+    # Determine config path (env var takes precedence)
+    config_path_str = os.environ.get('DRAFT_MANAGER_CONFIG', args.config)
+    config_path = Path(config_path_str)
+
+    if not config_path.exists():
+        print(f"Error: Configuration file not found: {config_path}")
+        sys.exit(1)
+
+    # Load config to get logging settings
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    logging_config = config.get('logging', {})
+
+    # Determine log level (env var > CLI arg > config)
+    if os.environ.get('DRAFT_MANAGER_LOG_LEVEL'):
+        log_level_str = os.environ['DRAFT_MANAGER_LOG_LEVEL']
+        log_level = getattr(logging, log_level_str.upper(), logging.INFO)
+    elif args.verbose:
+        log_level = logging.DEBUG
+    else:
+        log_level_str = logging_config.get('level', 'INFO')
+        log_level = getattr(logging, log_level_str.upper(), logging.INFO)
+
+    # Determine log file (env var > config)
+    log_file = os.environ.get('DRAFT_MANAGER_LOG_FILE', logging_config.get('file'))
+
+    # Get rotation settings from config
+    max_bytes = logging_config.get('max_bytes', 5*1024*1024)
+    backup_count = logging_config.get('backup_count', 3)
+
+    # Setup logging with rotation
+    setup_logging(
+        level=log_level,
+        log_file=log_file,
+        max_bytes=max_bytes,
+        backup_count=backup_count
+    )
 
     logger = logging.getLogger(__name__)
-
-    # Check if config file exists
-    config_path = Path(args.config)
-    if not config_path.exists():
-        logger.error(f"Configuration file not found: {args.config}")
-        sys.exit(1)
 
     # Load input data
     logger.info(f"Loading email records from: {args.email_file}")

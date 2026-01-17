@@ -1,0 +1,11 @@
+coordinator:
+  name: processing_coordinator
+  version: "1.0.0"
+
+children:
+  grade_manager: "./grade_manager"
+  feedback_manager: "./feedback_manager"
+
+logging:
+  level: INFO
+  file: "./logs/processing_coordinator.log"

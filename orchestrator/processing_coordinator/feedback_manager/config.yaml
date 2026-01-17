@@ -6,20 +6,6 @@ children:
   style_selector: "./style_selector"
   gemini_generator: "./gemini_generator"
 
-input:
-  file_path: "../grade_manager/data/output/file_2_3.xlsx"
-  columns:
-    email_id: "email_id"
-    grade: "grade"
-    status: "status"
-
-output:
-  file_path: "./data/output/file_3_4.xlsx"
-  columns:
-    email_id: "email_id"
-    reply: "reply"
-    status: "status"
-
 rate_limiting:
   delay_between_calls_seconds: 60
 

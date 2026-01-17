@@ -1,0 +1,7 @@
+shared:
+  name: shared_module
+  version: "1.0.0"
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

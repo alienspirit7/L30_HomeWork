@@ -1,0 +1,11 @@
+coordinator:
+  name: email_coordinator
+  version: "1.0.0"
+
+children:
+  email_reader: "./email_reader"
+  draft_manager: "./draft_manager"
+
+logging:
+  level: INFO
+  file: "./logs/email_coordinator.log"

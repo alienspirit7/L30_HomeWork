@@ -10,13 +10,43 @@ This module:
 """
 
 import logging
+import os
 import yaml
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 import sys
 
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    RetryError
+)
+
 # Setup logging
 logger = logging.getLogger(__name__)
+
+
+# Custom Exception Classes
+class DraftManagerError(Exception):
+    """Base exception for Draft Manager."""
+    pass
+
+
+class ValidationError(DraftManagerError):
+    """Input validation failed."""
+    pass
+
+
+class RetryExhaustedError(DraftManagerError):
+    """All retry attempts failed."""
+    pass
+
+
+# Required fields for validation
+REQUIRED_EMAIL_FIELDS = ['email_id', 'sender_email']
+REQUIRED_FEEDBACK_FIELDS = ['email_id', 'feedback', 'status']
 
 
 class DraftManager:
@@ -55,8 +85,80 @@ class DraftManager:
         with open(self.config_path, 'r') as f:
             config = yaml.safe_load(f)
 
+        # Apply environment variable overrides
+        config = self._apply_env_overrides(config)
+
         logger.info(f"Configuration loaded from {self.config_path}")
         return config
+
+    def _apply_env_overrides(self, config: dict) -> dict:
+        """Apply environment variable overrides to configuration."""
+        # Override logging level
+        if os.environ.get('DRAFT_MANAGER_LOG_LEVEL'):
+            config.setdefault('logging', {})
+            config['logging']['level'] = os.environ['DRAFT_MANAGER_LOG_LEVEL']
+            logger.debug(f"Log level overridden by env var: {config['logging']['level']}")
+
+        # Override log file path
+        if os.environ.get('DRAFT_MANAGER_LOG_FILE'):
+            config.setdefault('logging', {})
+            config['logging']['file'] = os.environ['DRAFT_MANAGER_LOG_FILE']
+            logger.debug(f"Log file overridden by env var: {config['logging']['file']}")
+
+        # Override child service paths
+        if os.environ.get('DRAFT_MANAGER_CHILDREN_COMPOSER'):
+            config.setdefault('children', {})
+            config['children']['draft_composer'] = os.environ['DRAFT_MANAGER_CHILDREN_COMPOSER']
+            logger.debug(f"Draft composer path overridden by env var")
+
+        if os.environ.get('DRAFT_MANAGER_CHILDREN_MAPPER'):
+            config.setdefault('children', {})
+            config['children']['student_mapper'] = os.environ['DRAFT_MANAGER_CHILDREN_MAPPER']
+            logger.debug(f"Student mapper path overridden by env var")
+
+        return config
+
+    def _validate_input_data(self, input_data: Dict[str, Any]) -> None:
+        """
+        Validate input data structure and required fields.
+
+        Args:
+            input_data: Dictionary containing email_records and feedback_records
+
+        Raises:
+            ValidationError: If required fields are missing
+        """
+        errors = []
+
+        # Check top-level keys
+        if 'email_records' not in input_data:
+            errors.append("Missing required key: 'email_records'")
+        if 'feedback_records' not in input_data:
+            errors.append("Missing required key: 'feedback_records'")
+
+        if errors:
+            raise ValidationError(f"Input validation failed: {'; '.join(errors)}")
+
+        # Validate each email record has required fields
+        email_records = input_data.get('email_records', [])
+        for idx, record in enumerate(email_records):
+            missing_fields = [f for f in REQUIRED_EMAIL_FIELDS if f not in record]
+            if missing_fields:
+                errors.append(
+                    f"Email record {idx}: missing required fields {missing_fields}"
+                )
+
+        # Validate each feedback record has required fields
+        feedback_records = input_data.get('feedback_records', [])
+        for idx, record in enumerate(feedback_records):
+            missing_fields = [f for f in REQUIRED_FEEDBACK_FIELDS if f not in record]
+            if missing_fields:
+                errors.append(
+                    f"Feedback record {idx}: missing required fields {missing_fields}"
+                )
+
+        if errors:
+            raise ValidationError(f"Input validation failed: {'; '.join(errors)}")
 
     def _init_child_services(self):
         """Initialize child services (Student Mapper and Draft Composer)."""
@@ -114,6 +216,9 @@ class DraftManager:
             ... })
             >>> print(result['drafts_created'])
         """
+        # Validate input data
+        self._validate_input_data(input_data)
+
         email_records = input_data.get('email_records', [])
         feedback_records = input_data.get('feedback_records', [])
 
@@ -208,7 +313,12 @@ class DraftManager:
             'in_reply_to': email_record.get('message_id', '')
         }
 
-        draft_result = self.draft_composer.process(draft_input)
+        try:
+            draft_result = self._call_draft_composer(draft_input)
+        except RetryError as e:
+            raise RetryExhaustedError(
+                f"All retry attempts failed for draft creation: {e}"
+            ) from e
 
         logger.info(f"Draft {draft_result.get('status')} for {email_id}")
 
@@ -218,6 +328,40 @@ class DraftManager:
             'status': draft_result.get('status'),
             'error': draft_result.get('error')
         }
+
+    def _call_draft_composer(self, draft_input: dict) -> dict:
+        """
+        Call draft composer with retry logic.
+
+        Uses exponential backoff for transient failures.
+
+        Args:
+            draft_input: Dictionary containing draft parameters
+
+        Returns:
+            Draft result dictionary
+
+        Raises:
+            RetryError: If all retry attempts fail
+        """
+        # Get retry config with defaults
+        retry_config = self.config.get('retry', {})
+        max_attempts = retry_config.get('max_attempts', 3)
+        min_wait = retry_config.get('min_wait_seconds', 2)
+        max_wait = retry_config.get('max_wait_seconds', 10)
+
+        @retry(
+            stop=stop_after_attempt(max_attempts),
+            wait=wait_exponential(multiplier=1, min=min_wait, max=max_wait),
+            retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+            before_sleep=lambda retry_state: logger.warning(
+                f"Retry {retry_state.attempt_number}/{max_attempts} for draft composer..."
+            )
+        )
+        def _retry_call():
+            return self.draft_composer.process(draft_input)
+
+        return _retry_call()
 
     def _compose_email_body(
         self,

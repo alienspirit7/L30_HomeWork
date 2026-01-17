@@ -2,20 +2,19 @@
 Feedback Manager Service
 Level 2 - Task Manager
 
-Manages AI feedback generation: selecting feedback styles based on grades
-and generating personalized feedback using Gemini API.
+Orchestrates feedback generation by coordinating style_selector and gemini_generator.
+Excel I/O is handled by parent coordinator.
 """
 
 import argparse
+import importlib.util
 import logging
-import os
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Type
 
 import yaml
-from openpyxl import load_workbook, Workbook
 
 
 class FeedbackManager:
@@ -48,46 +47,96 @@ class FeedbackManager:
             raise ValueError(f"Invalid YAML in config file: {e}")
 
     def _setup_logging(self):
-        """Configure logging based on config settings."""
+        """Configure logging based on config settings using module-specific logger."""
         log_config = self.config.get('logging', {})
-        log_level = getattr(logging, log_config.get('level', 'INFO'))
-        log_file = log_config.get('file', './logs/feedback_manager.log')
+        log_level = getattr(logging, log_config.get('level', 'INFO').upper(), logging.INFO)
+        log_file_config = log_config.get('file', './logs/feedback_manager.log')
         log_format = log_config.get('format',
             '%(asctime)s | %(levelname)s | %(name)s | %(message)s')
 
+        # Resolve log file path relative to this file's directory
+        base_path = Path(__file__).parent.resolve()
+        log_file = (base_path / log_file_config).resolve()
+
         # Create logs directory if it doesn't exist
-        log_dir = Path(log_file).parent
-        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Setup handlers
-        handlers = [logging.FileHandler(log_file)]
-        if log_config.get('console', True):
-            handlers.append(logging.StreamHandler(sys.stdout))
+        # Create module-specific logger (does not affect root logger)
+        logger_name = self.config['manager']['name']
+        self.logger = logging.getLogger(logger_name)
+        self.logger.setLevel(log_level)
 
-        logging.basicConfig(
-            level=log_level,
-            format=log_format,
-            handlers=handlers
-        )
+        # Avoid adding duplicate handlers if logger already configured
+        if not self.logger.handlers:
+            formatter = logging.Formatter(log_format)
 
-        self.logger = logging.getLogger(self.config['manager']['name'])
+            # File handler
+            file_handler = logging.FileHandler(log_file)
+            file_handler.setLevel(log_level)
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
+
+            # Console handler (optional)
+            if log_config.get('console', True):
+                console_handler = logging.StreamHandler(sys.stdout)
+                console_handler.setLevel(log_level)
+                console_handler.setFormatter(formatter)
+                self.logger.addHandler(console_handler)
+
         self.logger.info(
             f"Feedback Manager v{self.config['manager']['version']} initialized"
         )
 
+    def _load_module_from_path(self, module_name: str, module_path: Path) -> Any:
+        """
+        Dynamically load a module from a file path using importlib.
+
+        Args:
+            module_name: Name to assign to the loaded module
+            module_path: Path to the module's .py file
+
+        Returns:
+            The loaded module
+
+        Raises:
+            ImportError: If module cannot be loaded
+        """
+        if not module_path.exists():
+            raise ImportError(f"Module file not found: {module_path}")
+
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Cannot create module spec for: {module_path}")
+
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        return module
+
     def _initialize_child_services(self):
         """Initialize child services (style_selector and gemini_generator)."""
         try:
-            # Import child services
-            sys.path.insert(0, str(Path(__file__).parent))
+            # Resolve paths relative to this file's directory
+            base_path = Path(__file__).parent.resolve()
 
-            from style_selector.service import StyleSelector
-            from gemini_generator.service import GeminiGeneratorService
+            style_selector_path = (base_path / self.config['children']['style_selector']).resolve()
+            gemini_generator_path = (base_path / self.config['children']['gemini_generator']).resolve()
 
-            # Initialize services
-            style_selector_path = Path(self.config['children']['style_selector'])
-            gemini_generator_path = Path(self.config['children']['gemini_generator'])
+            # Load child service modules dynamically
+            style_module = self._load_module_from_path(
+                "style_selector_service",
+                style_selector_path / "service.py"
+            )
+            gemini_module = self._load_module_from_path(
+                "gemini_generator_service",
+                gemini_generator_path / "service.py"
+            )
 
+            # Get service classes
+            StyleSelector = style_module.StyleSelector
+            GeminiGeneratorService = gemini_module.GeminiGeneratorService
+
+            # Initialize services with their config files
             style_config = style_selector_path / "config.yaml"
             gemini_config = gemini_generator_path / "config.yaml"
 
@@ -95,79 +144,29 @@ class FeedbackManager:
             self.gemini_generator = GeminiGeneratorService(config_path=str(gemini_config))
 
             self.logger.info("Child services initialized successfully")
+        except ImportError as e:
+            self.logger.error(f"Failed to import child services: {e}")
+            raise
         except Exception as e:
             self.logger.error(f"Failed to initialize child services: {e}")
             raise
 
-    def _load_grade_records(self, input_file: str) -> List[Dict[str, Any]]:
-        """
-        Load grade records from Excel file.
-
-        Args:
-            input_file: Path to input Excel file
-
-        Returns:
-            List of grade records with status="Ready"
-        """
-        self.logger.info(f"Loading grade records from: {input_file}")
-
-        try:
-            wb = load_workbook(input_file)
-            ws = wb.active
-
-            # Get column mappings
-            col_config = self.config['input']['columns']
-            email_col = col_config['email_id']
-            grade_col = col_config['grade']
-            status_col = col_config['status']
-
-            # Read header row to find column indices
-            headers = {cell.value: idx for idx, cell in enumerate(ws[1], 1)}
-
-            # Validate required columns exist
-            required_cols = [email_col, grade_col, status_col]
-            for col in required_cols:
-                if col not in headers:
-                    raise ValueError(f"Required column '{col}' not found in input file")
-
-            # Extract records with status="Ready"
-            records = []
-            for row in ws.iter_rows(min_row=2, values_only=True):
-                email_id = row[headers[email_col] - 1]
-                grade = row[headers[grade_col] - 1]
-                status = row[headers[status_col] - 1]
-
-                if status == "Ready":
-                    records.append({
-                        'email_id': email_id,
-                        'grade': float(grade) if grade is not None else None,
-                        'status': status
-                    })
-
-            self.logger.info(f"Loaded {len(records)} records with status='Ready'")
-            return records
-
-        except FileNotFoundError:
-            self.logger.error(f"Input file not found: {input_file}")
-            raise
-        except Exception as e:
-            self.logger.error(f"Error loading grade records: {e}")
-            raise
-
-    def _generate_feedback_for_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
+    def generate_feedback(self, grade_record: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate feedback for a single grade record.
 
         Args:
-            record: Grade record with email_id and grade
+            grade_record: Dict with 'email_id', 'grade', etc.
 
         Returns:
-            Feedback record with email_id, reply, and status
+            Dict with 'email_id', 'reply', 'status', 'error' (if any)
         """
-        email_id = record['email_id']
-        grade = record['grade']
+        email_id = grade_record.get('email_id')
+        grade = grade_record.get('grade')
 
         try:
+            self.logger.debug(f"Generating feedback for {email_id}, grade: {grade}")
+
             # Step 1: Select style based on grade
             style_result = self.style_selector.process({'grade': grade})
             style_name = style_result['style_name']
@@ -187,22 +186,24 @@ class FeedbackManager:
 
             feedback_result = self.gemini_generator.process(gemini_input)
 
+            # Step 3: Return result
             if feedback_result['status'] == 'Success' and feedback_result['feedback']:
+                self.logger.info(f"Successfully generated feedback for {email_id}")
                 return {
                     'email_id': email_id,
                     'reply': feedback_result['feedback'],
-                    'status': 'Ready'
+                    'status': 'Ready',
+                    'error': None
                 }
             else:
-                # API failed, mark as missing reply
+                # API failed
                 error_msg = feedback_result.get('error', 'Unknown error')
-                self.logger.warning(
-                    f"Failed to generate feedback for {email_id}: {error_msg}"
-                )
+                self.logger.warning(f"Failed to generate feedback for {email_id}: {error_msg}")
                 return {
                     'email_id': email_id,
                     'reply': None,
-                    'status': 'Missing: reply'
+                    'status': 'Missing: reply',
+                    'error': error_msg
                 }
 
         except Exception as e:
@@ -210,131 +211,69 @@ class FeedbackManager:
             return {
                 'email_id': email_id,
                 'reply': None,
-                'status': 'Missing: reply'
+                'status': 'Missing: reply',
+                'error': str(e)
             }
 
-    def _write_feedback_records(self, feedback_records: List[Dict[str, Any]],
-                                output_file: str):
-        """
-        Write feedback records to Excel file.
-
-        Args:
-            feedback_records: List of feedback records
-            output_file: Path to output Excel file
-        """
-        self.logger.info(f"Writing feedback records to: {output_file}")
-
-        try:
-            # Create output directory if it doesn't exist
-            output_path = Path(output_file)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Create workbook
-            wb = Workbook()
-            ws = wb.active
-
-            # Get column mappings
-            col_config = self.config['output']['columns']
-
-            # Write header
-            headers = [col_config['email_id'], col_config['reply'], col_config['status']]
-            ws.append(headers)
-
-            # Write data
-            for record in feedback_records:
-                ws.append([
-                    record['email_id'],
-                    record['reply'],
-                    record['status']
-                ])
-
-            # Save workbook
-            wb.save(output_file)
-            self.logger.info(f"Successfully wrote {len(feedback_records)} records")
-
-        except Exception as e:
-            self.logger.error(f"Error writing feedback records: {e}")
-            raise
-
-    def process(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def process(self, grade_records: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Main processing method for feedback generation.
         This is the interface method called by parent coordinator.
 
         Args:
-            input_data: Optional dict with 'grade_records' or uses input file path
+            grade_records: List of grade records from parent
 
         Returns:
-            Dictionary with feedback, output_file, generated_count, failed_count
+            Dict with 'feedback' list, 'generated_count', 'failed_count'
         """
-        self.logger.info("Starting feedback generation process")
+        self.logger.info(f"Starting feedback generation for {len(grade_records)} records")
 
-        try:
-            # Load grade records
-            if input_data and 'grade_records' in input_data:
-                grade_records = input_data['grade_records']
-            else:
-                input_file = self.config['input']['file_path']
-                grade_records = self._load_grade_records(input_file)
-
-            if not grade_records:
-                self.logger.warning("No grade records to process")
-                return {
-                    'feedback': [],
-                    'output_file': self.config['output']['file_path'],
-                    'generated_count': 0,
-                    'failed_count': 0
-                }
-
-            # Process each grade record
-            feedback_records = []
-            generated_count = 0
-            failed_count = 0
-            rate_limit_delay = self.config['rate_limiting']['delay_between_calls_seconds']
-
-            for idx, record in enumerate(grade_records, 1):
-                self.logger.info(f"Processing record {idx}/{len(grade_records)}: {record['email_id']}")
-
-                feedback_record = self._generate_feedback_for_record(record)
-                feedback_records.append(feedback_record)
-
-                if feedback_record['status'] == 'Ready':
-                    generated_count += 1
-                else:
-                    failed_count += 1
-
-                # Apply rate limiting between calls (except for last record)
-                if idx < len(grade_records) and rate_limit_delay > 0:
-                    self.logger.debug(f"Waiting {rate_limit_delay}s before next request")
-                    time.sleep(rate_limit_delay)
-
-            # Write output file
-            output_file = self.config['output']['file_path']
-            self._write_feedback_records(feedback_records, output_file)
-
-            # Return summary
-            result = {
-                'feedback': feedback_records,
-                'output_file': output_file,
-                'generated_count': generated_count,
-                'failed_count': failed_count
+        if not grade_records:
+            self.logger.warning("No grade records to process")
+            return {
+                'feedback': [],
+                'generated_count': 0,
+                'failed_count': 0
             }
 
-            self.logger.info(
-                f"Process complete: {generated_count} generated, {failed_count} failed"
-            )
-            return result
+        feedback_records = []
+        generated_count = 0
+        failed_count = 0
+        rate_limit_delay = self.config.get('rate_limiting', {}).get('delay_between_calls_seconds', 0)
 
-        except Exception as e:
-            self.logger.error(f"Error in feedback generation process: {e}")
-            raise
+        for idx, record in enumerate(grade_records, 1):
+            self.logger.info(f"Processing record {idx}/{len(grade_records)}: {record.get('email_id')}")
 
-    def health_check(self) -> Dict[str, Any]:
+            feedback_record = self.generate_feedback(record)
+            feedback_records.append(feedback_record)
+
+            if feedback_record['status'] == 'Ready':
+                generated_count += 1
+            else:
+                failed_count += 1
+
+            # Apply rate limiting between calls (except for last record)
+            if idx < len(grade_records) and rate_limit_delay > 0:
+                self.logger.debug(f"Rate limiting: waiting {rate_limit_delay}s")
+                time.sleep(rate_limit_delay)
+
+        result = {
+            'feedback': feedback_records,
+            'generated_count': generated_count,
+            'failed_count': failed_count
+        }
+
+        self.logger.info(
+            f"Process complete: {generated_count} generated, {failed_count} failed"
+        )
+        return result
+
+    def health_check(self) -> Dict[str, str]:
         """
         Perform health check on all services.
 
         Returns:
-            Dictionary with health status of all components
+            Dict with health status of all components
         """
         health = {
             'feedback_manager': 'OK',
@@ -367,10 +306,8 @@ class FeedbackManager:
 def main():
     """Main entry point for standalone execution."""
     parser = argparse.ArgumentParser(
-        description='Feedback Manager Service - Generate AI feedback for student grades'
+        description='Feedback Manager Service - Orchestrate AI feedback generation'
     )
-    parser.add_argument('--input', type=str,
-                       help='Path to input Excel file with grades')
     parser.add_argument('--config', type=str, default='config.yaml',
                        help='Path to config file')
     parser.add_argument('--verbose', action='store_true',
@@ -399,22 +336,18 @@ def main():
             print("="*60 + "\n")
             return 0
 
-        # Process feedback generation
-        input_data = None
-        if args.input:
-            # Override config input path
-            manager.config['input']['file_path'] = args.input
-
-        result = manager.process(input_data)
-
-        # Display results
+        # For standalone testing, create sample data
         print("\n" + "="*60)
-        print("FEEDBACK GENERATION COMPLETE")
+        print("FEEDBACK MANAGER - Standalone Test")
         print("="*60)
-        print(f"Total records processed: {len(result['feedback'])}")
-        print(f"Successfully generated:  {result['generated_count']}")
-        print(f"Failed:                  {result['failed_count']}")
-        print(f"Output file:             {result['output_file']}")
+        print("Note: This is a coordination service.")
+        print("For full testing, use parent coordinator with real data.")
+        print("\nRunning health check...")
+        print("="*60)
+
+        health = manager.health_check()
+        for service, status in health.items():
+            print(f"{service:.<30} {status}")
         print("="*60 + "\n")
 
         return 0

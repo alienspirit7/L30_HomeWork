@@ -1,0 +1,20 @@
+orchestrator:
+  name: homework_grading_orchestrator
+  version: "1.0.0"
+
+modes:
+  test:
+    batch_size: 1
+  batch:
+    max_batch_size: 100
+    default_batch_size: 10
+  full:
+    process_all: true
+
+children:
+  email_coordinator: "./email_coordinator"
+  processing_coordinator: "./processing_coordinator"
+
+logging:
+  level: INFO
+  file: "./logs/orchestrator.log"
