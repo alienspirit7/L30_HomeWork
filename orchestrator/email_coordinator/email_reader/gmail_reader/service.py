@@ -66,14 +66,18 @@ class GmailReaderService:
 
         Creates or refreshes credentials and builds the Gmail service.
         """
+        from pathlib import Path
+        
         creds = None
-        token_path = self.config['gmail']['token_path']
-        credentials_path = self.config['gmail']['credentials_path']
+        # Resolve paths relative to this service.py file location
+        service_dir = Path(__file__).parent.absolute()
+        token_path = (service_dir / self.config['gmail']['token_path']).resolve()
+        credentials_path = (service_dir / self.config['gmail']['credentials_path']).resolve()
         scopes = self.config['gmail']['scopes']
 
         # Load existing token if available
-        if os.path.exists(token_path):
-            creds = Credentials.from_authorized_user_file(token_path, scopes)
+        if token_path.exists():
+            creds = Credentials.from_authorized_user_file(str(token_path), scopes)
 
         # Refresh or create new credentials
         if not creds or not creds.valid:
@@ -83,14 +87,12 @@ class GmailReaderService:
             else:
                 self.logger.info("Starting OAuth flow for new credentials")
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    credentials_path, scopes
+                    str(credentials_path), scopes
                 )
                 creds = flow.run_local_server(port=0)
 
             # Save credentials
-            token_dir = os.path.dirname(token_path)
-            if token_dir and not os.path.exists(token_dir):
-                os.makedirs(token_dir)
+            token_path.parent.mkdir(parents=True, exist_ok=True)
             with open(token_path, 'w') as token:
                 token.write(creds.to_json())
             self.logger.info(f"Credentials saved to {token_path}")

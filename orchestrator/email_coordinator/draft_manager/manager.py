@@ -190,15 +190,25 @@ class DraftManager:
             raise
 
         try:
-            # Draft Composer
+            # Draft Composer - use importlib to avoid path conflicts
+            import importlib.util
+            
             draft_composer_rel = self.config['children']['draft_composer']
             draft_composer_path = (manager_dir / draft_composer_rel).resolve()
-            sys.path.insert(0, str(draft_composer_path))
+            service_file = draft_composer_path / "service.py"
+            
+            if not service_file.exists():
+                raise ImportError(f"service.py not found at {service_file}")
+            
+            # Load the module explicitly from its file path
+            spec = importlib.util.spec_from_file_location("draft_composer_service", service_file)
+            draft_composer_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(draft_composer_module)
+            
+            DraftComposerService = draft_composer_module.DraftComposerService
             
             original_cwd = os.getcwd()
             os.chdir(draft_composer_path)
-            from service import DraftComposerService
-
             self.draft_composer = DraftComposerService(
                 str(draft_composer_path / "config.yaml")
             )

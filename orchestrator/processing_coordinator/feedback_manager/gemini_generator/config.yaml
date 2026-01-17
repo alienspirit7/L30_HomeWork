@@ -4,7 +4,7 @@ service:
 
 gemini:
   api_key_env: "GEMINI_API_KEY"
-  model: "gemini-pro"
+  model: "gemini-2.5-flash-lite"
 
 rate_limiting:
   request_delay_seconds: 60

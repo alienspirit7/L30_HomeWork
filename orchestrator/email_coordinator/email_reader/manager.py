@@ -208,8 +208,7 @@ class EmailReaderManager:
 
         for raw_email in raw_emails:
             try:
-                parser_input = {'raw_email': raw_email}
-                parsed_email = self.email_parser.parse(parser_input)
+                parsed_email = self.email_parser.parse(raw_email)
                 parsed_emails.append(parsed_email)
 
                 if parsed_email.get('status') == 'Ready':
