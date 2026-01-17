@@ -13,12 +13,14 @@ from typing import Dict, List, Any
 import yaml
 
 # Add child service paths to Python path
-sys.path.insert(0, str(Path(__file__).parent / "gmail_reader"))
-sys.path.insert(0, str(Path(__file__).parent / "email_parser"))
+manager_dir = Path(__file__).parent.absolute()
+sys.path.insert(0, str(manager_dir / "gmail_reader"))
+sys.path.insert(0, str(manager_dir / "email_parser"))
+sys.path.insert(0, str(manager_dir / "email_parser" / "src"))
 
 try:
-    from gmail_reader.service import GmailReaderService
-    from email_parser.src.email_parser import EmailParser
+    from service import GmailReaderService
+    from email_parser import EmailParser
 except ImportError as e:
     print(f"Warning: Could not import child services: {e}")
     GmailReaderService = None
@@ -100,28 +102,45 @@ class EmailReaderManager:
     def _initialize_child_services(self):
         """Initialize child services (Gmail Reader and Email Parser)."""
         children = self.config.get('children', {})
+        
+        # Get the directory where this manager.py is located
+        manager_dir = Path(__file__).parent.absolute()
 
         # Initialize Gmail Reader
         gmail_reader_path = children.get('gmail_reader', './gmail_reader')
-        gmail_config_path = os.path.join(gmail_reader_path, 'config.yaml')
+        # Resolve path relative to manager.py location
+        gmail_reader_abs = (manager_dir / gmail_reader_path).resolve()
+        gmail_config_path = gmail_reader_abs / 'config.yaml'
 
         if GmailReaderService:
             try:
-                self.gmail_reader = GmailReaderService(config_path=gmail_config_path)
+                # Change working directory temporarily to gmail_reader for proper config resolution
+                original_cwd = os.getcwd()
+                os.chdir(gmail_reader_abs)
+                self.gmail_reader = GmailReaderService(config_path=str(gmail_config_path))
+                os.chdir(original_cwd)
                 self.logger.info("Gmail Reader service initialized")
             except Exception as e:
                 self.logger.error(f"Failed to initialize Gmail Reader: {e}")
+                if 'original_cwd' in locals():
+                    os.chdir(original_cwd)
 
         # Initialize Email Parser
         email_parser_path = children.get('email_parser', './email_parser')
-        parser_config_path = os.path.join(email_parser_path, 'config.yaml')
+        email_parser_abs = (manager_dir / email_parser_path).resolve()
+        parser_config_path = email_parser_abs / 'config.yaml'
 
         if EmailParser:
             try:
-                self.email_parser = EmailParser(config_path=parser_config_path)
+                original_cwd = os.getcwd()
+                os.chdir(email_parser_abs)
+                self.email_parser = EmailParser(config_path=str(parser_config_path))
+                os.chdir(original_cwd)
                 self.logger.info("Email Parser service initialized")
             except Exception as e:
                 self.logger.error(f"Failed to initialize Email Parser: {e}")
+                if 'original_cwd' in locals():
+                    os.chdir(original_cwd)
 
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """

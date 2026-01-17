@@ -162,35 +162,53 @@ class DraftManager:
 
     def _init_child_services(self):
         """Initialize child services (Student Mapper and Draft Composer)."""
+        # Get the directory where this manager.py is located
+        manager_dir = Path(__file__).parent.absolute()
+        
         # Import child services
         try:
             # Student Mapper
-            student_mapper_path = Path(self.config['children']['student_mapper'])
+            student_mapper_rel = self.config['children']['student_mapper']
+            student_mapper_path = (manager_dir / student_mapper_rel).resolve()
             sys.path.insert(0, str(student_mapper_path))
+            
+            # Change to student_mapper directory for proper imports
+            original_cwd = os.getcwd()
+            os.chdir(student_mapper_path)
             from src.student_mapper import StudentMapper
 
             self.student_mapper = StudentMapper(
                 str(student_mapper_path / "config.yaml")
             )
+            os.chdir(original_cwd)
             logger.info("Student Mapper service initialized")
 
         except ImportError as e:
             logger.error(f"Failed to import Student Mapper: {e}")
+            if 'original_cwd' in locals():
+                os.chdir(original_cwd)
             raise
 
         try:
             # Draft Composer
-            draft_composer_path = Path(self.config['children']['draft_composer'])
+            draft_composer_rel = self.config['children']['draft_composer']
+            draft_composer_path = (manager_dir / draft_composer_rel).resolve()
             sys.path.insert(0, str(draft_composer_path))
+            
+            original_cwd = os.getcwd()
+            os.chdir(draft_composer_path)
             from service import DraftComposerService
 
             self.draft_composer = DraftComposerService(
                 str(draft_composer_path / "config.yaml")
             )
+            os.chdir(original_cwd)
             logger.info("Draft Composer service initialized")
 
         except ImportError as e:
             logger.error(f"Failed to import Draft Composer: {e}")
+            if 'original_cwd' in locals():
+                os.chdir(original_cwd)
             raise
 
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:

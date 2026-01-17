@@ -129,36 +129,51 @@ class GradeManagerService:
     def _initialize_child_services(self) -> None:
         """Initialize child services (GitHub Cloner and Python Analyzer)."""
         children_config = self.config.get('children', {})
-        base_path = Path(self.config_path).parent
+        
+        # Get the directory where this service.py is located (NOT based on config path)
+        service_dir = Path(__file__).parent.absolute()
         
         # Initialize GitHub Cloner
         if GitHubClonerService is not None:
-            cloner_path = base_path / children_config.get('github_cloner', './github_cloner')
+            cloner_rel_path = children_config.get('github_cloner', './github_cloner')
+            cloner_path = (service_dir / cloner_rel_path).resolve()
             cloner_config = cloner_path / 'config.yaml'
             try:
+                # Change working directory temporarily for proper config resolution
+                original_cwd = os.getcwd()
+                os.chdir(cloner_path)
                 self.github_cloner = GitHubClonerService(
                     config_path=str(cloner_config) if cloner_config.exists() else "config.yaml"
                 )
+                os.chdir(original_cwd)
                 self.logger.info("GitHub Cloner service initialized")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize GitHub Cloner: {e}")
                 self.github_cloner = None
+                if 'original_cwd' in locals():
+                    os.chdir(original_cwd)
         else:
             self.logger.warning("GitHubClonerService not available")
             self.github_cloner = None
         
         # Initialize Python Analyzer
         if PythonAnalyzerService is not None:
-            analyzer_path = base_path / children_config.get('python_analyzer', './python_analyzer')
+            analyzer_rel_path = children_config.get('python_analyzer', './python_analyzer')
+            analyzer_path = (service_dir / analyzer_rel_path).resolve()
             analyzer_config = analyzer_path / 'config.yaml'
             try:
+                original_cwd = os.getcwd()
+                os.chdir(analyzer_path)
                 self.python_analyzer = PythonAnalyzerService(
                     config_path=str(analyzer_config) if analyzer_config.exists() else "config.yaml"
                 )
+                os.chdir(original_cwd)
                 self.logger.info("Python Analyzer service initialized")
             except Exception as e:
                 self.logger.warning(f"Failed to initialize Python Analyzer: {e}")
                 self.python_analyzer = None
+                if 'original_cwd' in locals():
+                    os.chdir(original_cwd)
         else:
             self.logger.warning("PythonAnalyzerService not available")
             self.python_analyzer = None
