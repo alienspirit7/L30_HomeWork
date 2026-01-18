@@ -71,6 +71,37 @@ python main.py
 | 3 | Generate AI Feedback | feedback_manager | file_3_4.xlsx |
 | 4 | Create Email Drafts | draft_manager | Gmail drafts |
 
+## Test Run Screenshots
+
+### Run Logs
+
+**Step 2: Grading Repositories**
+
+![Grading logs showing repository cloning and grade calculation](docs/images/run_logs_grading.png)
+
+**Step 3: Generating AI Feedback**
+
+![Feedback generation logs showing style selection and Gemini API calls](docs/images/run_logs_feedback.png)
+
+### Generated Email Drafts
+
+The system generates personalized feedback based on grades using different styles:
+
+| Grade Range | Style | Tone |
+|-------------|-------|------|
+| 90+ | Trump | Confident, praising |
+| 70-89 | Hason | Encouraging, humorous |
+| 55-69 | Constructive | Professional, helpful |
+| <55 | Amsalem | Direct, motivating |
+
+**Example: Hason Style (Grade ~79)**
+
+![Email draft with humorous encouraging feedback](docs/images/email_feedback_hason.png)
+
+**Example: Amsalem Style (Grade 0)**
+
+![Email draft with direct motivating feedback](docs/images/email_feedback_amsalem.png)
+
 ## Module Descriptions
 
 ### Level 0: Orchestrator (Root)
