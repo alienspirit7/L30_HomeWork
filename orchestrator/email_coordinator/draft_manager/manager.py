@@ -46,7 +46,7 @@ class RetryExhaustedError(DraftManagerError):
 
 # Required fields for validation
 REQUIRED_EMAIL_FIELDS = ['email_id', 'sender_email']
-REQUIRED_FEEDBACK_FIELDS = ['email_id', 'feedback', 'status']
+REQUIRED_FEEDBACK_FIELDS = ['email_id', 'reply', 'status']
 
 
 class DraftManager:
@@ -162,21 +162,30 @@ class DraftManager:
 
     def _init_child_services(self):
         """Initialize child services (Student Mapper and Draft Composer)."""
+        import importlib.util
+        
         # Get the directory where this manager.py is located
         manager_dir = Path(__file__).parent.absolute()
         
         # Import child services
         try:
-            # Student Mapper
+            # Student Mapper - use importlib to avoid path conflicts
             student_mapper_rel = self.config['children']['student_mapper']
             student_mapper_path = (manager_dir / student_mapper_rel).resolve()
-            sys.path.insert(0, str(student_mapper_path))
+            mapper_file = student_mapper_path / "src" / "student_mapper.py"
             
-            # Change to student_mapper directory for proper imports
+            if not mapper_file.exists():
+                raise ImportError(f"student_mapper.py not found at {mapper_file}")
+            
+            # Load the module explicitly from its file path
+            spec = importlib.util.spec_from_file_location("student_mapper_module", mapper_file)
+            student_mapper_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(student_mapper_module)
+            
+            StudentMapper = student_mapper_module.StudentMapper
+            
             original_cwd = os.getcwd()
             os.chdir(student_mapper_path)
-            from src.student_mapper import StudentMapper
-
             self.student_mapper = StudentMapper(
                 str(student_mapper_path / "config.yaml")
             )
@@ -328,7 +337,7 @@ class DraftManager:
         # Compose email body
         email_body = self._compose_email_body(
             name=student_name,
-            feedback=feedback.get('feedback', ''),
+            feedback=feedback.get('reply', ''),
             repo_url=email_record.get('repo_url', '')
         )
 

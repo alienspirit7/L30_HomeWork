@@ -29,6 +29,7 @@ class DraftComposerService:
         Args:
             config_path: Path to the configuration file
         """
+        self.config_dir = Path(config_path).parent.absolute()
         self.config = self._load_config(config_path)
         self.logger = self._setup_logging()
         self.gmail_service = None
@@ -91,8 +92,9 @@ class DraftComposerService:
         gmail_config = self.config['gmail']
         creds = None
 
-        token_path = gmail_config['token_path']
-        credentials_path = gmail_config['credentials_path']
+        # Resolve paths relative to config directory
+        token_path = str(self.config_dir / gmail_config['token_path'])
+        credentials_path = str(self.config_dir / gmail_config['credentials_path'])
         scopes = gmail_config['scopes']
 
         # Load existing token if available
